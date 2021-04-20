@@ -1,0 +1,6 @@
+.vscode
+venv
+.idea
+.DS_Store
+*.pickle
+models/**
