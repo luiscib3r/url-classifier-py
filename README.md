@@ -1,7 +1,7 @@
 # Proyecto URL-Classifier
 
 
-## Modulo Generador de modelo de prediccion.
+## Módulo Generador de modelo de predicción.
 
 
 > Entrada de datos
@@ -14,9 +14,9 @@
 
 
 
-> Procesamiento de los datos y generacion del modelo de clasificacion
+> Procesamiento de los datos y generacion del modelo de clasificación
 
-- Extracion de las caracteristicas para generar el modelo
+- Extración de las caracteristicas para generar el modelo
 - Uso de librerias de ML (scikit-learn)
 
 > Salida de los datos
