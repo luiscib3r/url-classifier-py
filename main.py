@@ -6,8 +6,10 @@ import pandas as pd
 import unicodedata
 import random
 import re
+import pickle
 from tld import get_tld
 from urllib.parse import urlparse
+from datetime import datetime
 # ML algoritms
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -16,9 +18,15 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, precision_score
-import pickle
-from datetime import datetime
+from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, precision_score, classification_report
+
+#  imblearn
+from imblearn.under_sampling import NearMiss
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.combine import SMOTETomek
+from imblearn.ensemble import BalancedBaggingClassifier
+
+
 now = datetime.now()
 
 
@@ -276,6 +284,25 @@ def model_generator(x, y, algoritms):
     return (model, x_test, y_test)
 
 
+def run_model(X_train, X_test, y_train, y_test):
+    clf_base = LogisticRegression(
+        C=1.0, penalty='l2', random_state=1, solver="newton-cg", class_weight="balanced")
+    clf_base.fit(X_train, y_train)
+    return clf_base
+
+
+def mostrar_resultados(y_test, pred_y):
+    conf_matrix = confusion_matrix(y_test, pred_y)
+    plt.figure(figsize=(12, 12))
+    sns.heatmap(conf_matrix, xticklabels=["Benignas", "Malignas"], yticklabels=[
+                "Benignas", "Malignas"], annot=True, fmt="d")
+    plt.title("Confusion matrix")
+    plt.ylabel('True class')
+    plt.xlabel('Predicted class')
+    plt.show()
+    print(classification_report(y_test, pred_y))
+
+
 def evaluar_clf(clf, x_test, y_test):
 
     y_predict = clf.predict(x_test)
@@ -283,6 +310,7 @@ def evaluar_clf(clf, x_test, y_test):
     acc = accuracy_score(y_test, y_predict)
     prs = precision_score(y_test, y_predict)
     rcall = recall_score(y_test, y_predict)
+    print(classification_report(y_test, y_predict))
     print("Matriz Confusion", mtc)
     print("Accuracy", acc)
     print("Precision", prs)
@@ -291,24 +319,58 @@ def evaluar_clf(clf, x_test, y_test):
 
 if __name__ == '__main__':
 
-    df = pd.read_csv("./datasets/1_OK.csv")
-    print(df.groupby(df['result']).size())
-    # Contruir modelo con características léxicas basicas
-    X_basic, y_basic = url_eda(df)
-    algoritms = {
-        "dt": DecisionTreeClassifier(max_depth=10),
-        "rf": RandomForestClassifier(n_estimators=50, n_jobs=4),
-        "svc": SVC(kernel='rbf', random_state=0),
-        "ab": AdaBoostClassifier(n_estimators=50),
-        "gb": GradientBoostingClassifier(n_estimators=50),
-        "lr": LogisticRegression(random_state=0),
-        "gnb": GaussianNB(),
-    }
-    # genear modelo
-    model, x_test, y_test = model_generator(X_basic, y_basic, algoritms)
-    # evaluar modelo
-    evaluar_clf(model, x_test, y_test)
+    df = pd.read_csv("./datasets/dev/1_OK.csv")
+    app_env = "dev"
+    # print(df.groupby(df['result']).size())
+    # print(df.shape)
+    # print(pd.value_counts(df['result'], sort=True))
 
-    # salvar el modelo
-    date_time = now.strftime("%m-%d-%YT%H")
-    pickle.dump(model, open(f'./models/model_{date_time}.pickle', 'wb'))
+    # Contruir modelo con características léxicas básicas
+    X_basic, y_basic = url_eda(df)
+    if app_env == "prod":
+        algoritms = {
+            "dt": DecisionTreeClassifier(max_depth=10),
+            "rf": RandomForestClassifier(n_estimators=100,
+                                         bootstrap=True, verbose=2,
+                                         max_features='sqrt'),
+            "svc": SVC(kernel='rbf', random_state=0),
+            "lr": LogisticRegression(
+                C=1.0, penalty='l2', random_state=1, solver="newton-cg"),
+        }
+        # genear modelo
+        model, x_test, y_test = model_generator(X_basic, y_basic, algoritms)
+        # evaluar modelo
+        evaluar_clf(model, x_test, y_test)
+
+        # salvar el modelo
+        date_time = now.strftime("%m-%d-%YT%H")
+        pickle.dump(model, open(f'./models/model_{date_time}.pickle', 'wb'))
+    else:
+        # dev
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_basic, y_basic, train_size=0.7)
+        # model = run_model(X_train, X_test, y_train, y_test)
+
+        # Subsampling
+        # us = NearMiss()
+        # X_train_res, y_train_res = us.fit_resample(X_train, y_train)
+        # model = run_model(X_train_res, X_test, y_train_res, y_test)
+        # Oversampling
+        # os = RandomOverSampler()
+        # X_train_res, y_train_res = os.fit_resample(X_train, y_train)
+        # model = run_model(X_train_res, X_test, y_train_res, y_test)
+
+        # resampling con Smote-Tomek
+        # os_us = SMOTETomek()
+        # X_train_res, y_train_res = os_us.fit_resample(X_train, y_train)
+        # model = run_model(X_train_res, X_test, y_train_res, y_test)
+        # pred_y = model.predict(X_test)
+        bbc = BalancedBaggingClassifier(base_estimator=DecisionTreeClassifier(),
+                                        sampling_strategy='auto',
+                                        replacement=False,
+                                        random_state=0)
+        # Train the classifier.
+        bbc.fit(X_train, y_train)
+        pred_y = bbc.predict(X_test)
+        mostrar_resultados(y_test, pred_y)
