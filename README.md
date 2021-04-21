@@ -14,9 +14,9 @@
 
 
 
-> Procesamiento de los datos y generacion del modelo de clasificación
+> Procesamiento de los datos y generación del modelo de clasificación
 
-- Extración de las caracteristicas para generar el modelo
+- Extración de las características para generar el modelo
 - Uso de librerias de ML (scikit-learn)
 
 > Salida de los datos
